@@ -1,0 +1,19 @@
+<resources>
+
+    <style name="Base.Theme.VitrineApp"
+        parent="Theme.Material3.Light.NoActionBar">
+
+        <item name="colorPrimary">@color/primary_green</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">@color/secondary_green</item>
+        <item name="colorSurface">@color/app_surface</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorError">@color/error_red</item>
+        <item name="android:windowBackground">@color/app_background</item>
+
+    </style>
+
+    <style name="Theme.VitrineApp"
+        parent="Base.Theme.VitrineApp" />
+
+</resources>
