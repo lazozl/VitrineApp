@@ -9,7 +9,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.widget.doAfterTextChanged
 import com.example.vitrine.databinding.ActivityLoginBinding
-
+import android.content.Intent
 class LoginActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityLoginBinding
@@ -49,11 +49,13 @@ class LoginActivity : AppCompatActivity() {
         }
 
         binding.tvRegister.setOnClickListener {
-            Toast.makeText(
+
+            val intent = Intent(
                 this,
-                "Registration screen coming soon",
-                Toast.LENGTH_SHORT
-            ).show()
+                RegisterActivity::class.java
+            )
+
+            startActivity(intent)
         }
     }
 
