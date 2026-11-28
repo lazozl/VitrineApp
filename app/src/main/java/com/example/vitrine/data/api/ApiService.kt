@@ -10,12 +10,8 @@ import retrofit2.http.POST
 interface ApiService {
 
     @POST("auth/v1/token?grant_type=password")
-    suspend fun login(
-        @Body request: LoginRequest
-    ): Response<AuthResponse>
+    suspend fun login(@Body request: LoginRequest): Response<AuthResponse>
 
     @POST("auth/v1/signup")
-    suspend fun register(
-        @Body request: RegisterRequest
-    ): Response<AuthResponse>
+    suspend fun register(@Body request: RegisterRequest): Response<AuthResponse>
 }

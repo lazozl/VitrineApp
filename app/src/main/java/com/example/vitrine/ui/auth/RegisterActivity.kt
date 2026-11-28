@@ -9,57 +9,49 @@ import android.widget.ArrayAdapter
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
-import com.example.vitrine.databinding.ActivityRegisterBinding
 import com.example.vitrine.data.api.ApiClient
 import com.example.vitrine.data.model.RegisterRequest
 import com.example.vitrine.data.model.RegisterMetadata
+import com.example.vitrine.databinding.ActivityRegisterBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import java.io.IOException
 
 class RegisterActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityRegisterBinding
 
-    private val groupCodes = listOf(
-        "GRP01",
-        "GRP02",
-        "GRP03",
-        "GRP04",
-        "GRP05",
-        "GRP06",
-        "GRP07"
+    private val groups = listOf(
+        "GRP01", "GRP02", "GRP03", "GRP04",
+        "GRP05", "GRP06", "GRP07"
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         binding = ActivityRegisterBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        setupGroupDropdown()
+        setupDropdown()
         setupListeners()
     }
 
-    private fun setupGroupDropdown() {
-
+    private fun setupDropdown() {
         val adapter = ArrayAdapter(
             this,
             android.R.layout.simple_dropdown_item_1line,
-            groupCodes
+            groups
         )
 
         binding.etGroupCode.setAdapter(adapter)
 
         binding.etGroupCode.setOnItemClickListener { _, _, _, _ ->
             binding.groupLayout.error = null
-            hideGeneralError()
+            hideError()
         }
     }
 
     private fun setupListeners() {
-
         binding.btnRegister.setOnClickListener {
             validateRegistration()
         }
@@ -70,33 +62,31 @@ class RegisterActivity : AppCompatActivity() {
 
         binding.etName.doAfterTextChanged {
             binding.nameLayout.error = null
-            hideGeneralError()
+            hideError()
         }
 
         binding.etEmail.doAfterTextChanged {
             binding.emailLayout.error = null
-            hideGeneralError()
+            hideError()
         }
 
         binding.etPhone.doAfterTextChanged {
             binding.phoneLayout.error = null
-            hideGeneralError()
+            hideError()
         }
 
         binding.etPassword.doAfterTextChanged {
             binding.passwordLayout.error = null
             binding.confirmPasswordLayout.error = null
-            hideGeneralError()
+            hideError()
         }
 
         binding.etConfirmPassword.doAfterTextChanged {
             binding.confirmPasswordLayout.error = null
-            hideGeneralError()
+            hideError()
         }
 
-        binding.etConfirmPassword.setOnEditorActionListener {
-                _, actionId, _ ->
-
+        binding.etConfirmPassword.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_DONE) {
                 validateRegistration()
                 true
@@ -107,225 +97,119 @@ class RegisterActivity : AppCompatActivity() {
     }
 
     private fun validateRegistration() {
-
         if (!binding.btnRegister.isEnabled) return
 
         val name = binding.etName.text.toString().trim()
         val email = binding.etEmail.text.toString().trim()
         val phone = binding.etPhone.text.toString().trim()
-        val groupCode = binding.etGroupCode.text.toString().trim()
+        val group = binding.etGroupCode.text.toString()
         val password = binding.etPassword.text.toString()
-        val confirmPassword =
-            binding.etConfirmPassword.text.toString()
+        val confirm = binding.etConfirmPassword.text.toString()
 
-        binding.nameLayout.error = null
-        binding.emailLayout.error = null
-        binding.phoneLayout.error = null
-        binding.groupLayout.error = null
-        binding.passwordLayout.error = null
-        binding.confirmPasswordLayout.error = null
+        hideError()
 
-        hideGeneralError()
+        when {
+            name.isBlank() -> {
+                binding.nameLayout.error = "Full name is required"
+            }
 
-        var isValid = true
+            !Patterns.EMAIL_ADDRESS.matcher(email).matches() -> {
+                binding.emailLayout.error = "Enter a valid email"
+            }
 
-        if (name.isEmpty()) {
-            binding.nameLayout.error = "Full name is required"
-            isValid = false
+            phone.isNotEmpty() &&
+                    !phone.matches(Regex("^\\+?[0-9]{8,15}$")) -> {
+                binding.phoneLayout.error = "Invalid phone number"
+            }
+
+            group !in groups -> {
+                binding.groupLayout.error = "Select your group"
+            }
+
+            password.length < 8 -> {
+                binding.passwordLayout.error = "Minimum 8 characters"
+            }
+
+            password != confirm -> {
+                binding.confirmPasswordLayout.error = "Passwords do not match"
+            }
+
+            else -> {
+                val data = RegisterMetadata(
+                    name,
+                    group,
+                    phone.ifBlank { null }
+                )
+
+                register(RegisterRequest(email, password, data))
+            }
         }
-
-        if (email.isEmpty()) {
-            binding.emailLayout.error = "Email is required"
-            isValid = false
-
-        } else if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-
-            binding.emailLayout.error = "Enter a valid email address"
-            isValid = false
-        }
-
-        if (phone.isNotEmpty() &&
-            !phone.matches(Regex("^\\+?[0-9]{8,15}$"))
-        ) {
-
-            binding.phoneLayout.error = "Enter a valid phone number"
-            isValid = false
-        }
-
-        if (groupCode !in groupCodes) {
-            binding.groupLayout.error = "Select your group code"
-            isValid = false
-        }
-
-        if (password.isEmpty()) {
-            binding.passwordLayout.error = "Password is required"
-            isValid = false
-
-        } else if (password.length < 8) {
-
-            binding.passwordLayout.error =
-                "Password must contain at least 8 characters"
-
-            isValid = false
-        }
-
-        if (confirmPassword.isEmpty()) {
-
-            binding.confirmPasswordLayout.error =
-                "Please confirm your password"
-
-            isValid = false
-
-        } else if (password != confirmPassword) {
-
-            binding.confirmPasswordLayout.error =
-                "Passwords do not match"
-
-            isValid = false
-        }
-
-        if (!isValid) return
-
-        submitRegistration(
-            name,
-            email,
-            phone,
-            groupCode,
-            password
-        )
     }
 
-    private fun submitRegistration(
-        name: String,
-        email: String,
-        phone: String,
-        groupCode: String,
-        password: String
-    ) {
-
-        hideGeneralError()
+    private fun register(request: RegisterRequest) {
         setLoading(true)
 
         lifecycleScope.launch {
-
             try {
-
-                val request = RegisterRequest(
-                    email = email,
-                    password = password,
-                    data = RegisterMetadata(
-                        fullName = name,
-                        groupCode = groupCode,
-                        phone = phone.ifBlank { null }
-                    )
-                )
-
                 val response = ApiClient.service.register(request)
 
-                if (response.isSuccessful) {
+                if (response.isSuccessful && response.body() != null) {
+                    val message =
+                        if (!response.body()?.accessToken.isNullOrBlank()) {
+                            "You can now sign in."
+                        } else {
+                            "Check your email for confirmation if required."
+                        }
 
-                    val result = response.body()
-
-                    if (!result?.accessToken.isNullOrBlank()) {
-
-                        MaterialAlertDialogBuilder(
-                            this@RegisterActivity
-                        )
-                            .setTitle("Registration successful")
-                            .setMessage(
-                                "Please sign in to your account."
-                            )
-                            .setPositiveButton("Sign in") { _, _ ->
-                                finish()
-                            }
-                            .setCancelable(false)
-                            .show()
-
-                    } else {
-
-                        MaterialAlertDialogBuilder(
-                            this@RegisterActivity
-                        )
-                            .setTitle("Registration request received")
-                            .setMessage(
-                                "Check your email for confirmation if required, " +
-                                        "then try signing in."
-                            )
-                            .setPositiveButton("Back to sign in") { _, _ ->
-                                finish()
-                            }
-                            .show()
-                    }
-
+                    MaterialAlertDialogBuilder(this@RegisterActivity)
+                        .setTitle("Registration request received")
+                        .setMessage(message)
+                        .setPositiveButton("Sign in") { _, _ ->
+                            finish()
+                        }
+                        .show()
                 } else {
-
-                    when (response.code()) {
-
-                        400, 409, 422 -> showGeneralError(
-                            "Unable to register. Check your details " +
-                                    "or try another email address."
-                        )
-
-                        429 -> showGeneralError(
-                            "Too many attempts. Try again later."
-                        )
-
-                        401, 403 -> showGeneralError(
-                            "Registration is not authorized."
-                        )
-
-                        else -> showGeneralError(
-                            "Server error. Please try again."
-                        )
+                    val message = when (response.code()) {
+                        400, 409, 422 -> "Check your details or use another email"
+                        401, 403 -> "Registration is not authorized"
+                        429 -> "Too many attempts. Try again later"
+                        else -> "Server error. Please try again"
                     }
+
+                    showError(message)
                 }
-
             } catch (e: CancellationException) {
-
                 throw e
-
             } catch (e: IOException) {
-
-                showGeneralError(
-                    "Connection failed. Check your internet connection."
-                )
-
+                showError("Check your internet connection")
             } catch (e: Exception) {
-
-                showGeneralError(
-                    "Something went wrong. Please try again."
-                )
-
+                showError("Something went wrong")
             } finally {
-
                 setLoading(false)
             }
         }
     }
 
-    private fun showGeneralError(message: String) {
-
+    private fun showError(message: String) {
         binding.tvRegisterError.text = message
         binding.tvRegisterError.visibility = View.VISIBLE
     }
 
-    private fun hideGeneralError() {
-
+    private fun hideError() {
         binding.tvRegisterError.visibility = View.GONE
     }
 
-    private fun setLoading(isLoading: Boolean) {
-
+    private fun setLoading(loading: Boolean) {
         binding.progressBar.visibility =
-            if (isLoading) View.VISIBLE else View.GONE
+            if (loading) View.VISIBLE else View.GONE
 
-        binding.btnRegister.isEnabled = !isLoading
-        binding.btnGoToLogin.isEnabled = !isLoading
-        binding.etName.isEnabled = !isLoading
-        binding.etEmail.isEnabled = !isLoading
-        binding.etPhone.isEnabled = !isLoading
-        binding.etGroupCode.isEnabled = !isLoading
-        binding.etPassword.isEnabled = !isLoading
-        binding.etConfirmPassword.isEnabled = !isLoading
+        binding.btnRegister.isEnabled = !loading
+        binding.btnGoToLogin.isEnabled = !loading
+        binding.etName.isEnabled = !loading
+        binding.etEmail.isEnabled = !loading
+        binding.etPhone.isEnabled = !loading
+        binding.etGroupCode.isEnabled = !loading
+        binding.etPassword.isEnabled = !loading
+        binding.etConfirmPassword.isEnabled = !loading
     }
 }

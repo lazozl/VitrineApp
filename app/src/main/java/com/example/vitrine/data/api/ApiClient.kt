@@ -6,38 +6,25 @@ import retrofit2.converter.gson.GsonConverterFactory
 
 object ApiClient {
 
-    private const val BASE_URL =
-        "https://hbbrfjspweksdqpoplci.supabase.co/"
+    private const val BASE_URL = "https://hbbrfjspweksdqpoplci.supabase.co/"
+    private const val ANON_KEY = "sb_publishable_3QVoVl_xzWQf5hVkIy7_HQ_xXB_e7tH"
 
-    private const val ANON_KEY =
-        "sb_publishable_3QVoVl_xzWQf5hVkIy7_HQ_xXB_e7tH"
+    private val client = OkHttpClient.Builder()
+        .addInterceptor { chain ->
+            val request = chain.request().newBuilder()
+                .header("apikey", ANON_KEY)
+                .header("Accept", "application/json")
+                .build()
 
-    private val okHttpClient: OkHttpClient by lazy {
+            chain.proceed(request)
+        }
+        .build()
 
-        OkHttpClient.Builder()
-            .addInterceptor { chain ->
+    private val retrofit = Retrofit.Builder()
+        .baseUrl(BASE_URL)
+        .client(client)
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
 
-                val request = chain.request()
-                    .newBuilder()
-                    .header("apikey", ANON_KEY)
-                    .header("Accept", "application/json")
-                    .build()
-
-                chain.proceed(request)
-            }
-            .build()
-    }
-
-    val retrofit: Retrofit by lazy {
-
-        Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .client(okHttpClient)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-    }
-
-    val service: ApiService by lazy {
-        retrofit.create(ApiService::class.java)
-    }
+    val service: ApiService = retrofit.create(ApiService::class.java)
 }

@@ -1,38 +1,45 @@
-
 package com.example.vitrine.ui.auth
 
+import android.content.Intent
 import android.os.Bundle
 import android.util.Patterns
 import android.view.View
 import android.view.inputmethod.EditorInfo
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.widget.doAfterTextChanged
-import com.example.vitrine.databinding.ActivityLoginBinding
-import android.content.Intent
 import androidx.lifecycle.lifecycleScope
+import com.example.vitrine.MainActivity
 import com.example.vitrine.data.api.ApiClient
 import com.example.vitrine.data.model.LoginRequest
-import kotlinx.coroutines.launch
+import com.example.vitrine.databinding.ActivityLoginBinding
+import com.example.vitrine.utils.SessionManager
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.IOException
+
 class LoginActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityLoginBinding
+    private lateinit var sessionManager: SessionManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        sessionManager = SessionManager(this)
         setupListeners()
     }
 
     private fun setupListeners() {
-
         binding.btnLogin.setOnClickListener {
             validateLogin()
+        }
+
+        binding.tvRegister.setOnClickListener {
+            startActivity(Intent(this, RegisterActivity::class.java))
         }
 
         binding.etEmail.doAfterTextChanged {
@@ -53,143 +60,92 @@ class LoginActivity : AppCompatActivity() {
                 false
             }
         }
-
-        binding.tvRegister.setOnClickListener {
-
-            val intent = Intent(
-                this,
-                RegisterActivity::class.java
-            )
-
-            startActivity(intent)
-        }
     }
 
     private fun validateLogin() {
-        binding.tvLoginError.visibility = View.GONE
+        if (!binding.btnLogin.isEnabled) return
 
         val email = binding.etEmail.text.toString().trim()
         val password = binding.etPassword.text.toString()
 
-        binding.emailLayout.error = null
-        binding.passwordLayout.error = null
+        binding.tvLoginError.visibility = View.GONE
 
-        var isValid = true
-
-        if (email.isEmpty()) {
-            binding.emailLayout.error = "Email is required"
-            isValid = false
-        } else if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+        if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
             binding.emailLayout.error = "Enter a valid email address"
-            isValid = false
+            return
         }
 
-        if (password.isEmpty()) {
+        if (password.isBlank()) {
             binding.passwordLayout.error = "Password is required"
-            isValid = false
-        }
-
-        if (!isValid) {
             return
         }
 
         submitLogin(email, password)
     }
 
-
     private fun submitLogin(email: String, password: String) {
-
-        binding.tvLoginError.visibility = View.GONE
-
         setLoading(true)
 
         lifecycleScope.launch {
-
             try {
-
-                val request = LoginRequest(
-                    email = email,
-                    password = password
+                val response = ApiClient.service.login(
+                    LoginRequest(email, password)
                 )
 
-                val response = ApiClient.service.login(request)
+                val auth = response.body()
 
-                if (response.isSuccessful) {
+                if (response.isSuccessful && auth != null) {
+                    val saved = withContext(Dispatchers.IO) {
+                        sessionManager.saveSession(auth)
+                    }
 
-                    val authResponse = response.body()
-
-                    if (!authResponse?.accessToken.isNullOrBlank()) {
-
-                        Toast.makeText(
-                            this@LoginActivity,
-                            "Login successful!",
-                            Toast.LENGTH_LONG
-                        ).show()
-
-                        // Session management will be added next.
-
+                    if (saved) {
+                        openMainScreen()
                     } else {
-                        showLoginError("Invalid server response.")
+                        showLoginError("Unable to save session")
                     }
-
                 } else {
-
-                    when (response.code()) {
-
-                        400, 401 -> showLoginError(
-                            "Invalid email or password"
-                        )
-
-                        403 -> showLoginError(
-                            "Access denied."
-                        )
-
-                        429 -> showLoginError(
-                            "Too many attempts. Please try again later."
-                        )
-
-                        else -> showLoginError(
-                            "Server error. Please try again."
-                        )
+                    val message = when (response.code()) {
+                        400, 401 -> "Invalid email or password"
+                        403 -> "Access denied"
+                        429 -> "Too many attempts. Try again later"
+                        else -> "Server error. Please try again"
                     }
-                }
 
+                    showLoginError(message)
+                }
             } catch (e: CancellationException) {
                 throw e
-
             } catch (e: IOException) {
-
-                showLoginError(
-                    "Connection failed. Check your internet connection."
-                )
-
+                showLoginError("Check your internet connection")
             } catch (e: Exception) {
-
-                showLoginError(
-                    "Something went wrong. Please try again."
-                )
-
+                showLoginError("Something went wrong")
             } finally {
-
                 setLoading(false)
             }
         }
     }
+
     private fun showLoginError(message: String) {
-
         binding.tvLoginError.text = message
-
         binding.tvLoginError.visibility = View.VISIBLE
     }
 
-    private fun setLoading(isLoading: Boolean) {
-
+    private fun setLoading(loading: Boolean) {
         binding.progressBar.visibility =
-            if (isLoading) View.VISIBLE else View.GONE
+            if (loading) View.VISIBLE else View.GONE
 
-        binding.btnLogin.isEnabled = !isLoading
-        binding.etEmail.isEnabled = !isLoading
-        binding.etPassword.isEnabled = !isLoading
-        binding.tvRegister.isEnabled = !isLoading
+        binding.btnLogin.isEnabled = !loading
+        binding.etEmail.isEnabled = !loading
+        binding.etPassword.isEnabled = !loading
+        binding.tvRegister.isEnabled = !loading
+    }
+
+    private fun openMainScreen() {
+        val intent = Intent(this, MainActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        finish()
     }
 }
