@@ -38,3 +38,8 @@ data class UserMetadata(
     @SerializedName("full_name") val fullName: String?,
     @SerializedName("group_code") val groupCode: String?
 )
+
+data class RefreshRequest(
+    @SerializedName("refresh_token")
+    val refreshToken: String
+)

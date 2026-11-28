@@ -12,12 +12,19 @@ import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
+import com.example.vitrine.data.api.ApiClient
+import com.example.vitrine.data.model.RefreshRequest
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class SessionManager(context: Context) {
 
     private val file = File(context.noBackupFilesDir, "vitrine_session")
     private val gson = Gson()
     private val keyAlias = "VitrineSessionKey"
+    companion object {
+        private val refreshLock = Mutex()
+    }
 
     data class Session(
         val accessToken: String,
@@ -118,6 +125,28 @@ class SessionManager(context: Context) {
     }
 
     fun getRefreshToken(): String? = getSession()?.refreshToken
+
+    suspend fun refreshSession(): Boolean = refreshLock.withLock {
+        if (isLoggedIn()) return@withLock true
+
+        val token = getRefreshToken() ?: return@withLock false
+
+        val response = ApiClient.service.refresh(
+            RefreshRequest(token)
+        )
+
+        val auth = response.body()
+
+        if (response.isSuccessful && auth != null) {
+            saveSession(auth)
+        } else {
+            if (response.code() == 400 || response.code() == 401) {
+                clearSession()
+            }
+            false
+        }
+    }
+
 
     fun isLoggedIn(): Boolean = !getAccessToken().isNullOrBlank()
 

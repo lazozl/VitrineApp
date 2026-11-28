@@ -31,6 +31,30 @@ class LoginActivity : AppCompatActivity() {
 
         sessionManager = SessionManager(this)
         setupListeners()
+
+
+        setLoading(true)
+
+        lifecycleScope.launch {
+            try {
+                val loggedIn = withContext(Dispatchers.IO) {
+                    sessionManager.refreshSession()
+                }
+
+                if (loggedIn) {
+                    openMainScreen()
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: IOException) {
+                showLoginError("Check your internet connection")
+            } catch (e: Exception) {
+                showLoginError("Unable to restore session")
+            } finally {
+                setLoading(false)
+            }
+        }
+
     }
 
     private fun setupListeners() {
