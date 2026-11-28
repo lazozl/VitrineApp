@@ -10,6 +10,12 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.widget.doAfterTextChanged
 import com.example.vitrine.databinding.ActivityLoginBinding
 import android.content.Intent
+import androidx.lifecycle.lifecycleScope
+import com.example.vitrine.data.api.ApiClient
+import com.example.vitrine.data.model.LoginRequest
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import java.io.IOException
 class LoginActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityLoginBinding
@@ -90,29 +96,90 @@ class LoginActivity : AppCompatActivity() {
         submitLogin(email, password)
     }
 
-    private fun submitLogin(email: String, password: String) {
 
-        // Temporary mock authentication for testing only.
-        val testEmail = "test@example.com"
-        val testPassword = "Test1234"
+    private fun submitLogin(email: String, password: String) {
 
         binding.tvLoginError.visibility = View.GONE
 
-        if (email != testEmail || password != testPassword) {
+        setLoading(true)
 
-            binding.tvLoginError.text =
-                "Invalid email or password"
+        lifecycleScope.launch {
 
-            binding.tvLoginError.visibility = View.VISIBLE
+            try {
 
-            return
+                val request = LoginRequest(
+                    email = email,
+                    password = password
+                )
+
+                val response = ApiClient.service.login(request)
+
+                if (response.isSuccessful) {
+
+                    val authResponse = response.body()
+
+                    if (!authResponse?.accessToken.isNullOrBlank()) {
+
+                        Toast.makeText(
+                            this@LoginActivity,
+                            "Login successful!",
+                            Toast.LENGTH_LONG
+                        ).show()
+
+                        // Session management will be added next.
+
+                    } else {
+                        showLoginError("Invalid server response.")
+                    }
+
+                } else {
+
+                    when (response.code()) {
+
+                        400, 401 -> showLoginError(
+                            "Invalid email or password"
+                        )
+
+                        403 -> showLoginError(
+                            "Access denied."
+                        )
+
+                        429 -> showLoginError(
+                            "Too many attempts. Please try again later."
+                        )
+
+                        else -> showLoginError(
+                            "Server error. Please try again."
+                        )
+                    }
+                }
+
+            } catch (e: CancellationException) {
+                throw e
+
+            } catch (e: IOException) {
+
+                showLoginError(
+                    "Connection failed. Check your internet connection."
+                )
+
+            } catch (e: Exception) {
+
+                showLoginError(
+                    "Something went wrong. Please try again."
+                )
+
+            } finally {
+
+                setLoading(false)
+            }
         }
+    }
+    private fun showLoginError(message: String) {
 
-        Toast.makeText(
-            this,
-            "Test login successful. API connection pending.",
-            Toast.LENGTH_LONG
-        ).show()
+        binding.tvLoginError.text = message
+
+        binding.tvLoginError.visibility = View.VISIBLE
     }
 
     private fun setLoading(isLoading: Boolean) {
